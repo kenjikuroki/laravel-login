@@ -1,0 +1,126 @@
+#!/usr/bin/php
+<?php
+
+// a small terminal script for providing an easier access to the MAMP PRO remote debugging options
+// it provides an easier syntax than the system's builtin defaults command 
+// and is specifically tailored to MAMP PRO
+
+$showusage = true;
+if(empty($basename)) {
+	$basename = basename(__FILE__);
+}
+
+if(isset($argv) && is_array($argv) && count($argv) > 1) {
+	
+	// collect all specified command line parameters:
+	$basename = basename($argv[0]);
+	$options = array();
+	$verbose = false;
+	$status = false;
+	foreach($argv as $arg) {
+		
+		$cleanarg = trim(strtolower($arg));
+		if($cleanarg == "help" || $cleanarg == "h") {
+			$options = array();
+			$showusage = true;
+		} else {
+			if($cleanarg == "verbose" || $cleanarg == "v") {
+				$verbose = true;
+			}
+			if($cleanarg == "status" || $cleanarg == "s") {
+				$verbose = true;
+				$status = true;
+				$options[] = "none";
+			}
+			if($cleanarg == "none" || $cleanarg == "n") {
+				if(!in_array("none",$options)) {
+					$options[] = "none";
+				}
+			}
+			if(!in_array("none",$options)) {
+				if($cleanarg == "tempfiles" || $cleanarg == "t" || $cleanarg == "f" || $cleanarg == "full") {
+					if(!in_array("tempfiles",$options)) {
+						$options[] = "tempfiles";
+					}
+				}
+				if($cleanarg == "remotelog" || $cleanarg == "r" || $cleanarg == "f" || $cleanarg == "full") {
+					if(!in_array("remotelog",$options)) {
+						$options[] = "remotelog";
+					}
+				}
+			}
+		}
+		if(count($options) > 0) {
+			$showusage = false;
+		}
+	}
+	
+	// create a list of commands for these options and execute them:
+	if($showusage !== true && count($options) > 0) {
+		$showusage = false;
+		$commands = array();
+		$commandsVerify = array();
+		if(in_array("tempfiles",$options)) {
+			$commands[] = "defaults write de.appsolute.mamppro remoteDebugging -bool YES";
+		} else {
+			$commands[] = "defaults delete de.appsolute.mamppro remoteDebugging";
+		}
+		$commandsVerify["remoteDebugging"] = "defaults read de.appsolute.mamppro remoteDebugging";
+		
+		if(in_array("remotelog",$options)) {
+			$commands[] = "defaults write de.appsolute.mamppro remoteVerboseDebugging -bool YES";
+		} else {
+			$commands[] = "defaults delete de.appsolute.mamppro remoteVerboseDebugging";
+		}
+		$commandsVerify["remoteVerboseDebugging"] = "defaults read de.appsolute.mamppro remoteVerboseDebugging";
+		if($status !== true) {
+			if($verbose === true) {
+				echo "will execute these commands:".PHP_EOL;
+			}
+			foreach($commands as $command) {
+				if($verbose === true) {
+					echo "   ".$command.PHP_EOL;
+				}
+				$command = $command." 2>&1";
+				@shell_exec($command);
+			}
+		}
+		if($verbose === true) {
+			if($verbose === true) {
+				echo "Current settings:".PHP_EOL;
+			} else {
+				echo "Verfication:".PHP_EOL;
+			}
+			foreach($commandsVerify as $key => $command) {
+				$command = $command." 2>&1";
+				$ret = @shell_exec($command);
+				if(stripos($ret,"does not exist") !== false || stripos($ret,"defaults have not been changed") !== false) {
+					$ret = "0".PHP_EOL;
+				}
+				echo "   ".$key.": ".$ret;
+			}
+		}
+		
+	}
+}
+
+// or just print out the usage instructions:
+if($showusage === true) {
+	echo "MAMP PRO remote debug mode enabler. Usage:".PHP_EOL.PHP_EOL
+			."   ".$basename." <OPTION> [<OPTION>] [<OPTION>] ...".PHP_EOL
+			."   Valid options: ".PHP_EOL
+			."      none,n ........... disable all debugging features".PHP_EOL
+			."      tempfiles,t ...... keep temporary remote files".PHP_EOL
+			."      remotelog,r ...... increase loglevel for remote-php.log".PHP_EOL
+			."      full,f ........... all of the above".PHP_EOL
+			."      verbose,v ........ print out all executed commands and verify afterwards".PHP_EOL
+			."      status,s ......... don't actually change something, just show the current state of affairs".PHP_EOL
+			."      help,h ........... print out these instructions".PHP_EOL
+			."   Example:".PHP_EOL
+			."      ".$basename." full".PHP_EOL
+			."      ".$basename." t v".PHP_EOL
+			."      ".$basename." s".PHP_EOL
+			."      ".$basename." h".PHP_EOL.PHP_EOL;
+	exit(0);
+}
+?>
