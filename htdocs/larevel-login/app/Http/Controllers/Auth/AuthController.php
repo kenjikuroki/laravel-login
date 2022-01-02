@@ -11,6 +11,11 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
+    public function __construct(User $user)
+    {
+        $this->user = $user;
+    }
+
     /** @return View */
     public function showLogin()
     {
@@ -23,37 +28,31 @@ class AuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         //①アカウントがロックされたら弾く
-        $user = User::where('email', '=', $credentials['email'])->first();
-        
-        if(!is_null($user)){
-            if($user->locked_flg === 1) {
+        $user = $this->user->getUserByEmail($credentials['email']);
+
+        if (!is_null($user)) {
+            if ($this->user->isAccountLocked($user)) {
                 return back()->withErrors([
                     'danger' => 'アカウントがロックされています。'
                 ]);
             }
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
-            //②成功したらエラーカウントを0にする
-            if ($user->error_count >0 ) {
-                $user->error_count = 0;
-                $user->save();
-            }
-            
-            return redirect()->route('home')->with('success', 'ログイン成功しました');
-        }
-        //③ログイン失敗したらエラーカウントを１増やす
-        $user ->eror_count = $user ->error_count + 1;
-        //④エラーカウントが６以上の場合はアカウントをロックする
-        if ($user->error_count > 5 ) {
-            $user->locked_flg = 1;
-            $user-> save();
+            if (Auth::attempt($credentials)) {
+                $request->session()->regenerate();
+                //②成功したらエラーカウントを0にする
+                $this->user->resetErrorCount($user);
 
-            return back()->withErrors([
-                'danger' => 'アカウントがロックされました。解除する場合は運営に連絡して下さい',
-            ]);
+                return redirect()->route('home')->with('success', 'ログイン成功しました');
+            }
+            //③ログイン失敗したらエラーカウントを１増やす
+            $user->error_count = $this->user->addErrorCount($user->error_count);
+            //④エラーカウントが６以上の場合はアカウントをロックする
+            if ($this->user->lockAccount($user)) {
+                return back()->withErrors([
+                    'danger' => 'アカウントがロックされました。解除する場合は運営に連絡して下さい',
+                ]);
+            }
+            $user->save();
         }
-        $user-> save();
-    }
 
         return back()->withErrors([
             'danger' => 'メールアドレスかパスワードが間違っています。',
