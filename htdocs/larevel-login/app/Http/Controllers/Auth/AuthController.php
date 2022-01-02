@@ -6,10 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginFormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 
 
 class AuthController extends Controller
 {
+    public function __construct(User $user)
+    {
+        $this->user = $user;
+    }
+
     /** @return View */
     public function showLogin()
     {
@@ -21,10 +27,31 @@ class AuthController extends Controller
     {
         $credentials = $request->only('email', 'password');
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
+        //①アカウントがロックされたら弾く
+        $user = $this->user->getUserByEmail($credentials['email']);
 
-            return redirect()->route('home')->with('success', 'ログイン成功しました');
+        if (!is_null($user)) {
+            if ($this->user->isAccountLocked($user)) {
+                return back()->withErrors([
+                    'danger' => 'アカウントがロックされています。'
+                ]);
+            }
+            if (Auth::attempt($credentials)) {
+                $request->session()->regenerate();
+                //②成功したらエラーカウントを0にする
+                $this->user->resetErrorCount($user);
+
+                return redirect()->route('home')->with('success', 'ログイン成功しました');
+            }
+            //③ログイン失敗したらエラーカウントを１増やす
+            $user->error_count = $this->user->addErrorCount($user->error_count);
+            //④エラーカウントが６以上の場合はアカウントをロックする
+            if ($this->user->lockAccount($user)) {
+                return back()->withErrors([
+                    'danger' => 'アカウントがロックされました。解除する場合は運営に連絡して下さい',
+                ]);
+            }
+            $user->save();
         }
 
         return back()->withErrors([
