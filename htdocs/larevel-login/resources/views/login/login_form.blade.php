@@ -22,11 +22,9 @@
             <li>{{ $error }}</li>
         </ul>
         @endforeach
-        @if (session('login_error'))
-        <div class="alert alert-danger">
-            {{session('login_success')}}
-        </div>
-        @endif
+
+        <x-alert type="danger" :session="session('danger')"/>
+
         <label for="inputEmail" class="sr-only">Email address</label>
         <input type="email" id="inputEmail" name="email" class="form-control" placeholder="Email address" required autofocus>
         <label for="inputPassword" class="sr-only">Password</label>
